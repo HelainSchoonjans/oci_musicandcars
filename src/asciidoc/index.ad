@@ -1,0 +1,187 @@
+= Lab Instructions
+:icons: font
+
+== Files Of Interest
+- `grails-app/domain/demo/Car.groovy`
+- `grails-app/domain/demo/Album.groovy`
+- `grails-app/controllers/demo/MusicController.groovy`
+- `grails-app/controllers/musicandcars/UrlMappings.groovy`
+- `src/integration-test/groovy/demo/CarFunctionalSpec.groovy`
+- `src/integration-test/groovy/demo/MusicFunctionalSpec.groovy`
+
+== Notes
+
+The `CarFunctionalSpec` and `MusicFunctionalSpec` functional tests
+interact with a RESTful api that does not yet exist.  You will
+need to define that api in order to satisfy these tests.
+
+== Running The Tests
+
+The `check` task will run all of the tests including both unit and integration tests.
+
+    ./gradlew check
+
+The `integrationTest` task will run all of the integration tests.
+
+    ./gradlew integrationTest
+
+The `integrationTest` task may be abbreviated to `iT`.
+
+    ./gradlew iT
+
+When running tests from Gradle you may select which tests are run
+using the `--tests` switch.
+
+    ./gradlew iT --tests *CarFunctional*
+    ./gradlew iT --tests *MusicFunctional*
+
+== Satisfying CarFunctionalSpec
+
+NOTE: You should be able to make the `CarFunctionalSpec` tests pass
+by making changes to `Car.groovy` only.  No other changes are required.
+
+The `Car` domain class is currently empty.  One of the things you
+will need to do is define `make` and `model` properties in the class.
+Both of those properties should be of type `String`.
+
+The `CarFunctionalSpec` is sending requests to the api at
+http://localhost:8080/automobiles which needs to be written.
+
+Create the api by annotating the `Car` class with `grails.rest.Resource`.
+You will need to specify a value for the 'uri' attribute when applying
+the annotation.  The value of the `uri` attribute needs to be consistent
+with where the test expects the api to be.
+(See http://docs.grails.org/latest/guide/webServices.html#domainResources[Domain
+classes as REST resources] for more info.)
+
+== Satisfying MusicFunctionalSpec
+
+NOTE: You will be editing multiple files to make the `MusicFunctionalSpec`
+tests pass, but no changes are required to `MusicFunctionalSpec.groovy`.
+
+The `Album` domain class is currently empty.  One of the things you
+will need to do is define `artistName`, `title` and `genre`
+properties in the class.  The `artistName` and `title` properties
+should be of type `String`.  The `genre` property should be of type
+`Genre`.  The `Genre` enum is already defined in
+`src/main/groovy/demo/Genre.groovy`.  No changes to the enum are
+required. 
+
+The `MusicFunctionalSpec` is sending requests to the api at
+http://localhost:8080/albums which needs to be written.
+
+IMPORTANT: Do _not_ use the `grails.rest.Resource` annotation in
+the `Album` class. You will be providing a RESTful api via a different
+mechanism.
+
+Edit the `MusicController` class and have it extend
+`grails.rest.RestfulController`.  The `RestfulController` type
+is parameterized and the parameter should be `Album`.  You will
+need to provide a no argument constructor that passes `Album`
+as an argument to the super class constructor as shown below:
+
+[source,groovy]
+-------------------------------------------
+    // grails-app/controllers/demo/MusicController.groovy
+    package demo
+
+    import grails.rest.RestfulController
+
+    class MusicController extends RestfulController<Album> {
+
+        public MusicController() {
+            super(Album)
+        }
+    }
+-------------------------------------------
+
+Define a static property in `MusicController` named `responseFormats`.
+Initialize the value of `responseFormats` to be a `List` of `String`
+with 'json' being the first element in the list and `xml` being second.
+
+Define a RESTful url mapping in `UrlMappings.groovy` which will associate
+`/albums` with `music` resources.
+See http://docs.grails.org/latest/guide/theWebLayer.html#restfulMappings[Mapping
+to REST resources] for more information.
+
+[source,groovy]
+-------------------------------------------
+    // grails-app/controllers/musicandcars/UrlMappings.groovy
+    package musicandcars
+
+    class UrlMappings {
+
+        static mappings = {
+            // ...
+
+            "/albums"(resources: "music")
+
+            // ...
+        }
+    }
+-------------------------------------------
+
+
+With all of that done, 3 of the 4 tests in `MusicFunctionalSpec` should
+be satisfied.  Verify that 3 of the tests are passing before moving on
+to the last step.
+
+The last test in `MusicFunctionalSpec` that is failing looks like this:
+
+[source,groovy]
+----
+include::{projectdir}/src/integration-test/groovy/demo/MusicFunctionalSpec.groovy[tags=genre_query,indent=0]
+----
+<1> The `genre` query parameter is assigned `PROGRESSIVE_ROCK`
+<2> 2 `PROGRESSIVE_ROCK` albums are expected
+<3> The `genre` query parameter is assigned `HEAVY_METAL`
+<4> 1 `HEAVY_METAL` album is expected
+<5> The `genre` query parameter is assigned `BLUES`
+<6> 1 `BLUES` album is expected
+
+The test expects the api to respect the `genre` part of the URL
+as a query filter.  The  api should only return albums that belong to the
+specified genre.
+
+In order for that to work you will need to define a corresponding URL mapping.
+Add `"/genre/$genre/albums"(controller: 'music', action: 'index')` to
+`grails-app/controllers/musicandcars/UrlMappings.groovy`.
+
+In `MusicController` override the `listAllResources(Map params)` method
+that is inherited from `RestfulController`.
+
+[source,groovy]
+-------------------------------------------
+    package demo
+
+    import grails.rest.RestfulController
+
+    class MusicController extends RestfulController<Album> {
+
+        static responseFormats = ['json', 'xml']
+
+        public MusicController() {
+            super(Album)
+        }
+
+        @Override
+        protected List<Album> listAllResources(Map params) {
+            // return a List of Album here
+
+            // if params.genre exists, only return
+            // albums that are of that genre
+
+            // there are several query techniques
+            // which could be used here.  Use a
+            // "where" query.
+        }
+    }
+-------------------------------------------
+
+If the query in `listAllResources` is written correctly, all
+of the tests in `MusicFunctionalSpec` should be passing.
+
+NOTE: Learn more about "where" queries in the
+http://gorm.grails.org/6.0.x/hibernate/manual/#whereQueries[Where Queries]
+section of the GORM documentation.
+
